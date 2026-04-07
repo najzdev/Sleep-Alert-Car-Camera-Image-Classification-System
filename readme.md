@@ -25,3 +25,6 @@ Launch the Streamlit dashboard by running:
 python -m streamlit run Smile_detection.py
 ```
 The dashboard will open automatically in your default web browser (usually at http://localhost:8501).
+
+
+new v2 is coming soon
