@@ -331,8 +331,8 @@ CMD ["streamlit", "run", "app.py"]
 
 Thanks to all contributors who have helped this project!
 
-LABBAALLI Hamza
-ID-BOUBRIK Abdelouahed
-MAAROUF Yassine
-IDDAHA Soumaya
+- LABBAALLI Hamza
+- ID-BOUBRIK Abdelouahed
+- MAAROUF Yassine
+- IDDAHA Soumaya
 
