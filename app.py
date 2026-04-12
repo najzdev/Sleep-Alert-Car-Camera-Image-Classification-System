@@ -372,6 +372,10 @@ else:  # Demo Mode
 st.divider()
 st.markdown("""
     <div style='text-align: center; color: #666; font-size: 0.85em; margin-top: 20px;'>
+        <p style='font-weight: bold; color: #444; font-size: 1.1em;'>
+            Developed by: <br>
+            LABBAALLI Hamza | ID-BOUBRIK Abdelouahed | MAAROUF Yassine | IDDAHA Soumaya
+        </p>
         <p>Pro-Vision v2.0 | Advanced Driver Monitoring System</p>
         <p>Built with OpenCV, Streamlit, and Python</p>
     </div>
