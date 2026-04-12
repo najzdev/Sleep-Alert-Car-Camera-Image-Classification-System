@@ -329,10 +329,9 @@ CMD ["streamlit", "run", "app.py"]
 
 ## 👥 Contributors
 
-Thanks to all contributors who have helped this project!
-
 - LABBAALLI Hamza
 - ID-BOUBRIK Abdelouahed
 - MAAROUF Yassine
 - IDDAHA Soumaya
 
+Thanks to all contributors who have helped this project!
