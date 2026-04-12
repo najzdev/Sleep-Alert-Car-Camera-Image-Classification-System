@@ -326,3 +326,13 @@ CMD ["streamlit", "run", "app.py"]
 ---
 
 **Pro-Vision v2.0** - Built for Production ✅
+
+## 👥 Contributors
+
+Thanks to all contributors who have helped this project!
+
+LABBAALLI Hamza
+MAAROUF Yassine
+Id-BOUBRIK Abdelouahed
+IDDAHA Soumaya
+
