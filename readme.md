@@ -268,7 +268,7 @@ pro-vision-v2/
 
 ## 📄 License
 
-Free to use and modify. Built for educational and commercial use.
+Free to use and modify. Built for educational use only.
 
 ---
 
@@ -332,7 +332,7 @@ CMD ["streamlit", "run", "app.py"]
 Thanks to all contributors who have helped this project!
 
 LABBAALLI Hamza
+ID-BOUBRIK Abdelouahed
 MAAROUF Yassine
-Id-BOUBRIK Abdelouahed
 IDDAHA Soumaya
 
