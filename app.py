@@ -284,7 +284,7 @@ if mode == "Live Camera":
             
             # Update UI - Video Feed
             # NEW
-            video_placeholder.image(rgb_frame, channels="RGB", use_container_width=True)
+            video_placeholder.image(rgb_frame, channels="RGB",width="stretch")
             fps_placeholder.metric("FPS", f"{fps:.1f}", delta=None)
             
             # Update UI - Metrics
