@@ -1,10 +1,18 @@
 """
-Alert System & Event Logger - Pro-Vision v2.0
-Handles multi-level alerts and persistent event logging
+Alert System - Pro-Vision v2.0
+Multi-level alert management with cooldown, beep, and event logging.
+
+Alert levels
+------------
+NORMAL   -> driver attentive
+WARNING  -> eyes closing frequently (moderate risk)
+DROWSY   -> sustained eye closure (high risk, beep triggers)
 """
 
 import json
 import time
+import threading
+import platform
 from datetime import datetime
 from collections import deque
 from enum import Enum
@@ -12,137 +20,218 @@ from pathlib import Path
 from dataclasses import dataclass, asdict
 
 
-class AlertLevel(Enum):
-    """Alert severity levels"""
-    INFO = "INFO"
-    WARNING = "WARNING"
-    CRITICAL = "CRITICAL"
+# ---------------------------------------------------------------------------
+# Alert levels
+# ---------------------------------------------------------------------------
 
+class AlertLevel(Enum):
+    NORMAL  = "NORMAL"
+    WARNING = "WARNING"
+    DROWSY  = "DROWSY"
+
+
+# ---------------------------------------------------------------------------
+# Event data model
+# ---------------------------------------------------------------------------
 
 @dataclass
 class Event:
-    """Represents a system event"""
-    timestamp: str
+    timestamp:   str
     alert_level: str
-    message: str
+    message:     str
     drowsy_score: float = None
-    
-    def to_dict(self):
+
+    def to_dict(self) -> dict:
         return asdict(self)
 
 
+# ---------------------------------------------------------------------------
+# Event logger
+# ---------------------------------------------------------------------------
+
 class EventLogger:
-    """Persistent event logging system"""
-    
-    def __init__(self, max_events: int = 100, log_file: str = "vision_log.json"):
-        self.events = deque(maxlen=max_events)
+    """Appends events to an in-memory deque and optionally to disk."""
+
+    def __init__(self, max_events: int = 200, log_file: str = "vision_log.json"):
         self.log_file = Path(log_file)
-        self._load_from_disk()
-    
-    def log(self, alert_level: AlertLevel, message: str, drowsy_score: float = None):
-        """Record an event"""
+        self.events: deque = deque(maxlen=max_events)
+        self._load()
+
+    # ---- public ---
+
+    def log(
+        self,
+        level: AlertLevel,
+        message: str,
+        score: float = None,
+    ) -> Event:
         event = Event(
             timestamp=datetime.now().isoformat(),
-            alert_level=alert_level.value,
+            alert_level=level.value,
             message=message,
-            drowsy_score=drowsy_score
+            drowsy_score=score,
         )
         self.events.append(event)
-        self._save_to_disk()
+        self._save()
         return event
-    
-    def _save_to_disk(self):
-        """Persist events to JSON file"""
-        try:
-            with open(self.log_file, 'w') as f:
-                json.dump([e.to_dict() for e in self.events], f, indent=2)
-        except Exception as e:
-            print(f"Warning: Could not save logs to disk: {e}")
-    
-    def _load_from_disk(self):
-        """Load events from JSON file if exists"""
-        if self.log_file.exists():
-            try:
-                with open(self.log_file, 'r') as f:
-                    data = json.load(f)
-                    for item in data:
-                        self.events.append(Event(**item))
-            except Exception as e:
-                print(f"Warning: Could not load logs from disk: {e}")
-    
-    def get_recent(self, count: int = 10) -> list:
-        """Get N most recent events"""
-        return list(self.events)[-count:]
-    
-    def get_by_level(self, level: AlertLevel, count: int = 10) -> list:
-        """Get events by alert level"""
-        filtered = [e for e in self.events if e.alert_level == level.value]
-        return filtered[-count:]
-    
-    def clear(self):
-        """Clear all events"""
-        self.events.clear()
-        self._save_to_disk()
 
+    def get_recent(self, count: int = 10) -> list:
+        return list(self.events)[-count:]
+
+    def get_by_level(self, level: AlertLevel, count: int = 10) -> list:
+        return [e for e in self.events if e.alert_level == level.value][-count:]
+
+    def clear(self) -> None:
+        self.events.clear()
+        self._save()
+
+    # ---- private ---
+
+    def _save(self) -> None:
+        try:
+            with open(self.log_file, "w") as fh:
+                json.dump([e.to_dict() for e in self.events], fh, indent=2)
+        except OSError as exc:
+            print(f"[EventLogger] Could not save: {exc}")
+
+    def _load(self) -> None:
+        if not self.log_file.exists():
+            return
+        try:
+            with open(self.log_file, "r") as fh:
+                for item in json.load(fh):
+                    self.events.append(Event(**item))
+        except Exception as exc:
+            print(f"[EventLogger] Could not load: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Beep utility (cross-platform, non-blocking)
+# ---------------------------------------------------------------------------
+
+def _beep_non_blocking(frequency: int = 1000, duration_ms: int = 200, repeats: int = 3, gap_ms: int = 120) -> None:
+    """
+    Fire multiple beeps in a daemon thread (non-blocking).
+    repeats : number of beeps (default = 3)
+    gap_ms  : delay between beeps
+    """
+    def _play():
+        try:
+            sys_name = platform.system()
+
+            for _ in range(repeats):
+                if sys_name == "Windows":
+                    import winsound
+                    winsound.Beep(frequency, duration_ms)
+
+                elif sys_name == "Darwin":
+                    import subprocess
+                    subprocess.run(
+                        ["afplay", "/System/Library/Sounds/Ping.aiff"],
+                        check=False, capture_output=True,
+                    )
+
+                else:
+                    import subprocess
+                    result = subprocess.run(
+                        ["beep", f"-f{frequency}", f"-l{duration_ms}"],
+                        capture_output=True,
+                    )
+                    if result.returncode != 0:
+                        print("\a", end="", flush=True)
+
+                time.sleep(gap_ms / 1000.0)
+
+        except Exception:
+            for _ in range(repeats):
+                print("\a", end="", flush=True)
+                time.sleep(gap_ms / 1000.0)
+
+    threading.Thread(target=_play, daemon=True).start()
+
+# ---------------------------------------------------------------------------
+# Alert manager
+# ---------------------------------------------------------------------------
 
 class AlertManager:
-    """Manages multi-level alerts with cooldown and deduplication"""
-    
+    """
+    Evaluates the current drowsiness score and triggers alerts.
+
+    Thresholds (from config["alerts"]):
+        warning_threshold  : score above which WARNING fires
+        critical_threshold : score above which DROWSY fires
+        beep_cooldown      : seconds between audio alerts
+
+    The manager tracks the previous status to log only on transitions,
+    preventing log spam during sustained drowsy periods.
+    """
+
+    # BGR colors for border overlays
+    _COLORS = {
+        AlertLevel.NORMAL:  (0, 200, 0),    # green
+        AlertLevel.WARNING: (0, 165, 255),   # orange
+        AlertLevel.DROWSY:  (0, 0, 220),     # red
+    }
+
+    _MESSAGES = {
+        AlertLevel.NORMAL:  "NORMAL: Driver is attentive",
+        AlertLevel.WARNING: "WARNING: Eyes closing frequently",
+        AlertLevel.DROWSY:  "DROWSY: WAKE UP - Eyes closed too long",
+    }
+
     def __init__(self, config: dict, logger: EventLogger = None):
-        self.config = config["alerts"]
+        self._cfg = config["alerts"]
         self.logger = logger or EventLogger()
-        self.last_beep_time = 0
-        self.last_status = None
-    
-    def should_trigger_audio(self) -> bool:
-        """Check if enough time has passed since last alert"""
-        return (time.time() - self.last_beep_time) > self.config["beep_cooldown"]
-    
-    def record_beep(self):
-        """Update last beep timestamp"""
-        self.last_beep_time = time.time()
-    
-    def evaluate(self, drowsy_score: float, status_enum) -> dict:
+        self._last_beep: float = 0.0
+        self._last_level: AlertLevel | None = None
+
+    # ---- public ---
+
+    def evaluate(self, drowsy_score: float) -> dict:
         """
-        Evaluate alert requirements and log status changes
-        Returns: {should_alert, alert_level, alert_message}
+        Compute alert level and decide whether audio/visual should fire.
+
+        Returns
+        -------
+        dict with keys:
+            level         : AlertLevel
+            message       : str
+            border_color  : (B, G, R) tuple
+            play_beep     : bool
+            log_event     : bool  (True when level changed)
         """
-        status = status_enum.value
-        
-        alert_info = {
-            "should_alert": False,
-            "alert_level": AlertLevel.INFO,
-            "alert_message": "",
-            "border_color": (0, 255, 0)  # BGR format
+        level = self._classify(drowsy_score)
+        level_changed = level != self._last_level
+        now = time.time()
+        cooldown_elapsed = (now - self._last_beep) > self._cfg["beep_cooldown"]
+
+        play_beep = (level == AlertLevel.DROWSY) and cooldown_elapsed
+
+        if play_beep:
+            self._last_beep = now
+            _beep_non_blocking()
+
+        if level_changed:
+            self.logger.log(
+                AlertLevel[level.value],
+                self._MESSAGES[level],
+                drowsy_score,
+            )
+            self._last_level = level
+
+        return {
+            "level":        level,
+            "message":      self._MESSAGES[level],
+            "border_color": self._COLORS[level],
+            "play_beep":    play_beep,
+            "log_event":    level_changed,
         }
-        
-        # Log status changes
-        if status != self.last_status:
-            self.logger.log(AlertLevel.INFO, f"Status changed to {status}", drowsy_score)
-            self.last_status = status
-        
-        # Determine alert level
-        if drowsy_score > self.config["critical_threshold"]:
-            alert_info["alert_level"] = AlertLevel.CRITICAL
-            alert_info["should_alert"] = self.should_trigger_audio()
-            alert_info["alert_message"] = "🚨 CRITICAL: WAKE UP IMMEDIATELY!"
-            alert_info["border_color"] = (0, 0, 255)  # Red
-            self.logger.log(AlertLevel.CRITICAL, 
-                          "Driver sleeping detected", drowsy_score)
-        
-        elif drowsy_score > self.config["warning_threshold"]:
-            alert_info["alert_level"] = AlertLevel.WARNING
-            alert_info["alert_message"] = "⚠️ WARNING: Eyes closing frequently"
-            alert_info["border_color"] = (0, 165, 255)  # Orange
-            self.logger.log(AlertLevel.WARNING, 
-                          "Drowsiness detected", drowsy_score)
-        
-        else:
-            alert_info["alert_level"] = AlertLevel.INFO
-            alert_info["alert_message"] = "✅ AWAKE: Driver is attentive"
-            alert_info["border_color"] = (0, 255, 0)  # Green
-        
-        if alert_info["should_alert"]:
-            self.record_beep()
-        
-        return alert_info
+
+    # ---- private ---
+
+    def _classify(self, score: float) -> AlertLevel:
+        if score >= self._cfg["critical_threshold"]:
+            return AlertLevel.DROWSY
+        if score >= self._cfg["warning_threshold"]:
+            return AlertLevel.WARNING
+        return AlertLevel.NORMAL

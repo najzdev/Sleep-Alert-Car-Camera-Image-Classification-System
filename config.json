@@ -1,36 +1,28 @@
 {
   "detection": {
     "face_scale_factor": 1.1,
-    "face_min_neighbors": 6,
-    "face_min_size": 150,
+    "face_min_neighbors": 5,
+    "face_min_size": 80,
     "eye_scale_factor": 1.1,
-    "eye_min_neighbors": 5,
-    "clahe_clip_limit": 2.0,
-    "clahe_tile_size": 8
+    "clahe_clip_limit": 2.5,
+    "clahe_tile_size": 8,
+    "default_sensitivity": 12
   },
   "drowsiness": {
-    "history_window": 15,
-    "blink_threshold_frames": 2,
-    "eye_closed_ratio": 0.4,
-    "drowsy_threshold": 35,
-    "sleep_threshold": 75,
-    "score_increase": 10,
-    "score_decrease": 15
-  },
-  "performance": {
-    "skip_frames": 2,
-    "frame_width": 640,
-    "frame_height": 480,
-    "target_fps": 30
+    "history_window": 20,
+    "eye_closed_ratio": 0.3,
+    "blink_threshold_frames": 6,
+    "score_increase": 4.0,
+    "score_decrease": 2.5,
+    "drowsy_threshold": 45,
+    "sleep_threshold": 70
   },
   "alerts": {
-    "beep_cooldown": 2.0,
-    "warning_threshold": 35,
-    "critical_threshold": 75
+    "warning_threshold": 45,
+    "critical_threshold": 70,
+    "beep_cooldown": 5
   },
-  "logging": {
-    "enabled": true,
-    "max_logs": 100,
-    "log_events": ["status_change", "critical_alert", "calibration"]
+  "performance": {
+    "skip_frames": 2
   }
 }
